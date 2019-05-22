@@ -45,8 +45,8 @@ class Complete(object):
 
 
 transform = T.Compose([Complete(), T.Distance(norm=False)])
-train_dataset = TencentAlchemyDataset(root='.', mode='dev', transform=transform).shuffle()
-valid_dataset = TencentAlchemyDataset(root='.', mode='valid', transform=transform)
+train_dataset = TencentAlchemyDataset(root='data-bin', mode='dev', transform=transform).shuffle()
+valid_dataset = TencentAlchemyDataset(root='data-bin', mode='valid', transform=transform)
 
 
 valid_loader = DataLoader(valid_dataset, batch_size=64)
