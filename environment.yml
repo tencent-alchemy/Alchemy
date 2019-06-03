@@ -1,0 +1,6 @@
+name: Alchemy
+dependencies:
+        - pip
+        - rdkit 
+channels:
+        - conda-forge
