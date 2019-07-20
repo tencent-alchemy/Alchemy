@@ -34,7 +34,13 @@ class TencentAlchemyDataset(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        return [self.mode + '/sdf', self.mode + '/train.csv'] if self.mode == 'dev' else [self.mode + '/sdf', ]
+        if self.mode == 'dev':
+            return [self.mode + '/sdf', self.mode + '/train.csv']
+        elif self.mode == 'test':
+            return [self.mode + '/sdf', self.mode + '/test.csv']
+        else:
+            return [self.mode + '/sdf', ]
+
 
     @property
     def processed_file_names(self):
@@ -97,8 +103,12 @@ class TencentAlchemyDataset(InMemoryDataset):
 
         # for training set, we store its target
         # otherwise, we store its molecule id
-        l = torch.FloatTensor(self.target.loc[int(sdf_file.stem)].tolist()).unsqueeze(0) \
-                if self.mode == 'dev' else torch.LongTensor([int(sdf_file.stem)])
+        if self.mode == 'valid':
+            l = None
+        else:
+            l = torch.FloatTensor(self.target.loc[int(sdf_file.stem)].tolist()).unsqueeze(0)
+  
+        sdfid = torch.LongTensor([int(sdf_file.stem)])
 
         # Create nodes
         assert len(mol.GetConformers()) == 1
@@ -133,11 +143,16 @@ class TencentAlchemyDataset(InMemoryDataset):
                 edge_index=edge_index,
                 edge_attr=edge_attr,
                 y=l,
+                sdfid=sdfid,
                 )
         return data
 
     def process(self):
         if self.mode == 'dev':
+            self.target = pd.read_csv(self.raw_paths[1], index_col=0,
+                    usecols=['gdb_idx',] + ['property_%d' % x for x in range(12)])
+            self.target = self.target[['property_%d' % x for x in range(12)]]
+        if self.mode == 'test':
             self.target = pd.read_csv(self.raw_paths[1], index_col=0,
                     usecols=['gdb_idx',] + ['property_%d' % x for x in range(12)])
             self.target = self.target[['property_%d' % x for x in range(12)]]
