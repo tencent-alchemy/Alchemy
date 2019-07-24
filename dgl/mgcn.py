@@ -79,9 +79,9 @@ class MGCNModel(nn.Module):
         for k, v in kwargs.items():
             self.hyper_params[k] = v
 
-    def set_mean_std(self, mean, std):
-        self.mean_per_node = th.Tensor(mean)
-        self.std_per_node = th.Tensor(std)
+    def set_mean_std(self, mean, std, device):
+        self.mean_per_node = th.tensor(mean, device=device)
+        self.std_per_node = th.tensor(std, device=device)
 
     def forward(self, g):
 

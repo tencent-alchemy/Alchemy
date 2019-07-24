@@ -20,7 +20,9 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
     elif model == "mgcn":
         model = MGCNModel(norm=True, output_dim=12)
 
-    model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std)
+    model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std, device)
+    model.to(device)
+    
     loss_fn = nn.MSELoss()
     MAE_fn = nn.L1Loss()
     optimizer = th.optim.Adam(model.parameters(), lr=0.0001)
@@ -30,7 +32,7 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
         w_loss, w_mae = 0, 0
         model.train()
 
-        for batch in alchemy_loader:
+        for idx, batch in enumerate(alchemy_loader):
 
             res = model(batch.graph)
             loss = loss_fn(res, batch.label)
@@ -43,6 +45,7 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
             w_mae += mae.detach().item()
             w_loss += loss.detach().item()
 
+        w_mae /= idx + 1
         print("Epoch {:2d}, loss: {:.7f}, mae: {:.7f}".format(
             epoch, w_loss, w_mae))
 
