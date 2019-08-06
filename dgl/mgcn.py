@@ -1,17 +1,19 @@
+# -*- coding:utf-8 -*-
+
 import dgl
 import torch as th
 import torch.nn as nn
 from layers import AtomEmbedding, RBFLayer, EdgeEmbedding, \
-        MultiLevelInteraction
+    MultiLevelInteraction
 
 
 class MGCNModel(nn.Module):
     """
-  MGCN Model from:
+    MGCN Model from:
     Chengqiang Lu, et al.
     Molecular Property Prediction: A Multilevel
     Quantum Interactions Modeling Perspective. (AAAI'2019)
-  """
+    """
 
     def __init__(self,
                  dim=128,
@@ -26,12 +28,16 @@ class MGCNModel(nn.Module):
         """
         Args:
             dim: dimension of feature maps
-            cutoff: the edge larger than cutoff will be delete
+            out_put_dim: the num of target propperties to predict
+            edge_dim: dimension of edge feature
+            cutoff: the maximum distance between nodes
             width: width in the RBF layer
+            n_conv: number of convolutional layers
+            norm: normalization
             atom_ref: atom reference
                       used as the initial value of atom embeddings,
-                      Or set to None with random initialization
-            norm: normalization
+                      or set to None with random initialization
+            pre_train: pre_trained node embeddings
         """
         super().__init__()
         self.name = "MGCN"
@@ -43,14 +49,6 @@ class MGCNModel(nn.Module):
         self.n_conv = n_conv
         self.atom_ref = atom_ref
         self.norm = norm
-        self.register_hyper_params(dim=dim,
-                                   output_dim=output_dim,
-                                   edge_dim=edge_dim,
-                                   cutoff=cutoff,
-                                   width=width,
-                                   n_conv=n_conv,
-                                   atom_ref=atom_ref,
-                                   norm=norm)
 
         self.activation = nn.Softplus(beta=1, threshold=20)
 
@@ -71,13 +69,6 @@ class MGCNModel(nn.Module):
 
         self.node_dense_layer1 = nn.Linear(dim * (self.n_conv + 1), 64)
         self.node_dense_layer2 = nn.Linear(64, output_dim)
-
-    def register_hyper_params(self, **kwargs):
-        """Register the hyper parameters to the model"""
-
-        self.hyper_params = {}
-        for k, v in kwargs.items():
-            self.hyper_params[k] = v
 
     def set_mean_std(self, mean, std, device):
         self.mean_per_node = th.tensor(mean, device=device)

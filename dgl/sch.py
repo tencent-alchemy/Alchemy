@@ -27,12 +27,12 @@ class SchNetModel(nn.Module):
         Args:
             dim: dimension of features
             output_dim: dimension of prediction
-            cutoff: cutoff radius
+            cutoff: radius cutoff
             width: width in the RBF function
             n_conv: number of interaction layers
             atom_ref: used as the initial value of atom embeddings,
                       or set to None with random initialization
-            norm: use normalization
+            norm: normalization
         """
         super().__init__()
         self.name = "SchNet"
@@ -42,13 +42,6 @@ class SchNetModel(nn.Module):
         self.n_conv = n_conv
         self.atom_ref = atom_ref
         self.norm = norm
-        self.register_hyper_params(dim=dim,
-                                   cutoff=cutoff,
-                                   width=width,
-                                   n_conv=n_conv,
-                                   atom_ref=atom_ref,
-                                   norm=norm)
-
         self.activation = ShiftSoftplus()
 
         if atom_ref is not None:
@@ -64,9 +57,9 @@ class SchNetModel(nn.Module):
         self.atom_dense_layer1 = nn.Linear(dim, 64)
         self.atom_dense_layer2 = nn.Linear(64, output_dim)
 
-    def set_mean_std(self, mean, std, device):
-        self.mean_per_node = th.tensor(mean, device=device)
-        self.std_per_node = th.tensor(std, device=device)
+    def set_mean_std(self, mean, std, device="cpu"):
+        self.mean_per_atom = th.tensor(mean, device=device)
+        self.std_per_atom = th.tensor(std, device=device)
 
     def forward(self, g):
         """g is the DGL.graph"""
@@ -92,13 +85,6 @@ class SchNetModel(nn.Module):
         res = dgl.sum_nodes(g, "res")
         return res
 
-    def register_hyper_params(self, **kwargs):
-        """Register the hyper parameters to the model"""
-
-        self.hyper_params = {}
-        for k, v in kwargs.items():
-            self.hyper_params[k] = v
-
 
 if __name__ == "__main__":
     g = dgl.DGLGraph()
@@ -108,3 +94,4 @@ if __name__ == "__main__":
     g.ndata["node_type"] = th.LongTensor([1, 2])
     model = SchNetModel(dim=2)
     atom = model(g)
+    print(atom)

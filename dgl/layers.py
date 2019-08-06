@@ -1,13 +1,15 @@
+# -*- coding: utf-8 -*-
 import torch as th
 import numpy as np
 import torch.nn as nn
+import dgl.function as fn
 from torch.nn import Softplus
 
 
 class AtomEmbedding(nn.Module):
     """
     Convert the atom(node) list to atom embeddings.
-    The atom with the same element share the same inital embeddding.
+    The atom with the same element share the same initial embeddding.
     """
 
     def __init__(self, dim=128, type_num=100, pre_train=None):
@@ -28,7 +30,7 @@ class AtomEmbedding(nn.Module):
             self.embedding = nn.Embedding(type_num, dim, padding_idx=0)
 
     def forward(self, g, p_name="node"):
-        """Input is the dgl graph"""
+        """Input type is dgl graph"""
         atom_list = g.ndata["node_type"]
         g.ndata[p_name] = self.embedding(atom_list)
         return g.ndata[p_name]
@@ -37,10 +39,10 @@ class AtomEmbedding(nn.Module):
 class EdgeEmbedding(nn.Module):
     """
     Convert the edge to embedding.
-   The edge links same pair of atoms share the same inital embedding.
+    The edge links same pair of atoms share the same initial embedding.
     """
 
-    def __init__(self, dim=128, edge_num=300, pre_train=None):
+    def __init__(self, dim=128, edge_num=3000, pre_train=None):
         """
         Randomly init the edge embeddings.
         Args:
@@ -61,20 +63,23 @@ class EdgeEmbedding(nn.Module):
         """
         Generate the edge type based on the src&dst atom type of the edge.
         Note that C-O and O-C are the same edge type.
-        Note that current elements only contains H,C,N,O,F,
-            so that the edge type could be hashed as the multiply of atom-type
-            without conflict.
-            When more kinds of elements are included, this implementation could
-            be wrong. e.g. The multiply of C-C and Be-F are both 36.
+        To map a pair of nodes to one number, we use an unordered pairing function here
+        See more detail in this disscussion:
+        https://math.stackexchange.com/questions/23503/create-unique-number-from-2-numbers
+        Note that, the edge_num should larger than the square of maximum atomic number
+        in the dataset.
         """
         atom_type_x = edges.src["node_type"]
         atom_type_y = edges.dst["node_type"]
 
-        return {"type": atom_type_x * atom_type_y}
+        return {
+            "type":
+            atom_type_x * atom_type_y +
+            (th.abs(atom_type_x - atom_type_y) - 1)**2 / 4
+        }
 
-    def forward(self, g, p_name="edge_f", raw_type=False):
-        if not raw_type:
-            g.apply_edges(self.generate_edge_type)
+    def forward(self, g, p_name="edge_f"):
+        g.apply_edges(self.generate_edge_type)
         g.edata[p_name] = self.embedding(g.edata["type"])
         return g.edata[p_name]
 
@@ -98,11 +103,12 @@ class RBFLayer(nn.Module):
     """
     Radial basis functions Layer.
     e(d) = exp(- gamma * ||d - mu_k||^2)
-    gamma = 10
-    0 <= mu_k <= 30 for k=1~300
+    default settings:
+        gamma = 10
+        0 <= mu_k <= 30 for k=1~300
     """
 
-    def __init__(self, low=0, high=30, gap=0.1, dim=1, coef="p"):
+    def __init__(self, low=0, high=30, gap=0.1, dim=1):
         super().__init__()
         self._low = low
         self._high = high
@@ -114,22 +120,18 @@ class RBFLayer(nn.Module):
         self.centers = th.tensor(centers, dtype=th.float, requires_grad=False)
         self.centers = nn.Parameter(self.centers, requires_grad=False)
         self._fan_out = self._dim * self._n_centers
-        self.coef = coef
 
         self._gap = centers[1] - centers[0]
 
     def dis2rbf(self, edges):
         dist = edges.data["distance"]
         radial = dist - self.centers
-        if self.coef == "p":
-            coef = -1 / self._gap
-        else:
-            coef = -0.5 / (self._gap**2)
+        coef = -1 / self._gap
         rbf = th.exp(coef * (radial**2))
         return {"rbf": rbf}
 
     def forward(self, g):
-        """Convert distance scalr to rbf vector"""
+        """Convert distance scalar to rbf vector"""
         g.apply_edges(self.dis2rbf)
         return g.edata["rbf"]
 
@@ -144,6 +146,7 @@ class CFConv(nn.Module):
     def __init__(self, rbf_dim, dim=64, act="sp"):
         """
         Args:
+            rbf_dim: the dimsion of the RBF layer
             dim: the dimension of linear layers
             act: activation function (default shifted softplus)
         """
@@ -164,26 +167,12 @@ class CFConv(nn.Module):
         h = self.linear_layer1(rbf)
         h = self.activation(h)
         h = self.linear_layer2(h)
-        # h = self.activation(h)
         return {"h": h}
-
-    def send_edge_info(self, edges):
-        update_info = edges.src["new_node"] * edges.data["h"]
-        return {"neighbor_info": update_info}
-
-    def elemnet_wise_gather(self, nodes):
-        """
-        Implement element-wise multiplication (node x edge)
-        and reduce (sum) to nodes.
-        """
-        new_node = th.sum(nodes.mailbox["neighbor_info"], dim=1)
-        return {"new_node": new_node}
 
     def forward(self, g):
         g.apply_edges(self.update_edge)
-        g.send_and_recv(g.edges(),
-                        message_func=self.send_edge_info,
-                        reduce_func=self.elemnet_wise_gather)
+        g.update_all(message_func=fn.u_mul_e('new_node', 'h', 'neighbor_info'),
+                     reduce_func=fn.sum('neighbor_info', 'new_node'))
         return g.ndata["new_node"]
 
 
@@ -221,8 +210,9 @@ class VEConv(nn.Module):
     def __init__(self, rbf_dim, dim=64, update_edge=True):
         """
         Args:
+            rbf_dim: the dimension of the RBF layer
             dim: the dimension of linear layers
-            act: activation function (default shifted softplus)
+            update_edge: whether update the edge emebedding in each conv-layer
         """
         super().__init__()
         self._rbf_dim = rbf_dim
@@ -247,27 +237,22 @@ class VEConv(nn.Module):
         h = self.linear_layer3(edge_f)
         return {"edge_f": h}
 
-    def send_edge_info(self, edges):
-        update_info = edges.src["new_node"] * edges.data["h"] + edges.data[
-            "edge_f"]
-        return {"neighbor_info": update_info}
-
-    def elemnet_wise_gather(self, nodes):
-        """
-        Implement element-wise multiplication (node x edge)
-        and reduce (sum) to nodes.
-        """
-        new_node = th.sum(nodes.mailbox["neighbor_info"], dim=1)
-        return {"new_node": new_node}
-
     def forward(self, g):
         g.apply_edges(self.update_rbf)
         if self._update_edge:
             g.apply_edges(self.update_edge)
 
-        g.send_and_recv(g.edges(),
-                        message_func=self.send_edge_info,
-                        reduce_func=self.elemnet_wise_gather)
+        g.update_all(message_func=[
+            fn.u_mul_e("new_node", "h", "m_0"),
+            fn.copy_e("edge_f", "m_1")
+        ],
+                     reduce_func=[
+                         fn.sum("m_0", "new_node_0"),
+                         fn.sum("m_1", "new_node_1")
+                     ])
+        g.ndata["new_node"] = g.ndata.pop("new_node_0") + g.ndata.pop(
+            "new_node_1")
+
         return g.ndata["new_node"]
 
 
