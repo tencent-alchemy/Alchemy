@@ -1,3 +1,5 @@
+import os
+import re
 import os.path as osp
 import networkx as nx
 from rdkit import Chem
@@ -142,12 +144,21 @@ class TencentAlchemyDataset(Dataset):
         self.mode = mode
         self.transform = transform
         self.file_dir = pathlib.Path(get_download_dir(), mode)
-        self.zip_file_path = pathlib.Path(get_download_dir(), '%s.zip' % mode)
-        download(_urls['Alchemy'] + "%s.zip" % mode,
-                 path=str(self.zip_file_path))
-        extract_archive(str(self.zip_file_path), str(self.file_dir))
-
+        self.zip_file_path = pathlib.Path(get_download_dir(), '%s_v20190730.zip' % mode)
+        # download(_urls['Alchemy'] + "%s_v20190730.zip" % mode,
+        #          path=str(self.zip_file_path))
+        # extract_archive(str(self.zip_file_path), str(self.file_dir))
+        sub_dirs = os.listdir(self.file_dir)
+        if 'sdf' not in sub_dirs:
+            assert len(sub_dirs) == 1
+            self.file_dir = os.path.join(self.file_dir, sub_dirs[0])
         self._load()
+    
+    def _single_sdf_graph_reader(self, sdf_file):
+        result = self.sdf_graph_reader(sdf_file)
+        if result is None:
+            return (None, None)
+        return result
 
     def _load(self):
         if self.mode == 'dev':
@@ -162,14 +173,19 @@ class TencentAlchemyDataset(Dataset):
 
         sdf_dir = pathlib.Path(self.file_dir, "sdf")
         self.graphs, self.labels = [], []
-        cnt = 0
-        for sdf_file in sdf_dir.glob("**/*.sdf"):
-            result = self.sdf_graph_reader(sdf_file)
-            if result is None:
-                continue
-            cnt += 1
-            self.graphs.append(result[0])
-            self.labels.append(result[1])
+        # cnt = 0
+        # for sdf_file in sdf_dir.glob("**/*.sdf"):
+        #     result = self.sdf_graph_reader(sdf_file)
+        #     if result is None:
+        #         continue
+        #     cnt += 1
+        #     self.graphs.append(result[0])
+        #     self.labels.append(result[1])
+        from multiprocessing import Pool
+        with Pool() as pool:
+            results = pool.map(self._single_sdf_graph_reader, sdf_dir.glob("**/*.sdf"))
+
+        self.graphs, self.labels = list(zip(*results))
         self.normalize()
         print(len(self.graphs), "loaded!")
 
