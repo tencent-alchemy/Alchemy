@@ -31,6 +31,6 @@ The folder contains five python files:
 - `sch.py` the implementation of SchNet model.
 - `mgcn.py` the implementation of Multilevel Graph Convolutional Network(MGCN).
 - `layers.py` layers contained by two models above.
-- `Alchemy_dataset.py` example dataloader of [Tencent Alchemy](https://alchemy.tencent.com) dataset.
+- `Alchemy_dataset.py` dataloader of [Tencent Alchemy](https://alchemy.tencent.com) dataset.
 - `train.py` example training code.
 Modify `train.py` to switch between different implementations.
