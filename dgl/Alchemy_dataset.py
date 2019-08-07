@@ -77,18 +77,18 @@ class TencentAlchemyDataset(Dataset):
         for u in range(num_atoms):
             atom = mol.GetAtomWithIdx(u)
             symbol = atom.GetSymbol()
-            type = atom.GetAtomicNum()
+            atom_type = atom.GetAtomicNum()
             aromatic = atom.GetIsAromatic()
             hybridization = atom.GetHybridization()
             num_h = atom.GetTotalNumHs()
             atom_feats_dict['pos'].append(torch.FloatTensor(geom[u]))
-            atom_feats_dict['node_type'].append(type)
+            atom_feats_dict['node_type'].append(atom_type)
 
             h_u = []
             h_u += [
                 int(symbol == x) for x in ['H', 'C', 'N', 'O', 'F', 'S', 'Cl']
             ]
-            h_u.append(type)
+            h_u.append(atom_type)
             h_u.append(is_acceptor[u])
             h_u.append(is_donor[u])
             h_u.append(int(aromatic))
