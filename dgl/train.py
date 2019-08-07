@@ -1,5 +1,9 @@
-import torch as th
+# -*- coding:utf-8 -*-
+"""Sample training code
+"""
 
+import argparse
+import torch as th
 import torch.nn as nn
 from sch import SchNetModel
 from mgcn import MGCNModel
@@ -8,10 +12,11 @@ from Alchemy_dataset import TencentAlchemyDataset, batcher
 
 
 def train(model="sch", epochs=80, device=th.device("cpu")):
+    print("start")
     alchemy_dataset = TencentAlchemyDataset()
     alchemy_loader = DataLoader(dataset=alchemy_dataset,
                                 batch_size=20,
-                                collate_fn=batcher(device),
+                                collate_fn=batcher(),
                                 shuffle=False,
                                 num_workers=0)
 
@@ -22,7 +27,7 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
 
     model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std, device)
     model.to(device)
-    
+
     loss_fn = nn.MSELoss()
     MAE_fn = nn.L1Loss()
     optimizer = th.optim.Adam(model.parameters(), lr=0.0001)
@@ -33,6 +38,8 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
         model.train()
 
         for idx, batch in enumerate(alchemy_loader):
+            batch.graph.to(device)
+            batch.label = batch.label.to(device)
 
             res = model(batch.graph)
             loss = loss_fn(res, batch.label)
@@ -44,12 +51,19 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
 
             w_mae += mae.detach().item()
             w_loss += loss.detach().item()
-
         w_mae /= idx + 1
+
         print("Epoch {:2d}, loss: {:.7f}, mae: {:.7f}".format(
             epoch, w_loss, w_mae))
 
 
 if __name__ == "__main__":
-    device = th.device('cuda' if th.cuda.is_available() else 'cpu')
-    train("sch", 80, device)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-M",
+                        "--model",
+                        help="model name (sch or mgcn)",
+                        default="sch")
+    parser.add_argument("--epochs", help="number of epochs", default=250)
+    device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
+    args = parser.parse_args()
+    train(args.model, int(args.epochs), device)
