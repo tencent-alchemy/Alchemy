@@ -3,3 +3,5 @@ torch-scatter==1.2.0
 torch-sparse==0.4.0
 torch-cluster==1.4.0
 torch-geometric==1.2.1
+dgl==0.3
+rdkit
