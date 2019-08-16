@@ -24,6 +24,8 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
         model = SchNetModel(norm=True, output_dim=12)
     elif model == "mgcn":
         model = MGCNModel(norm=True, output_dim=12)
+    elif model == "MPNN":
+        model = MPNNModel(output_dim=12)
 
     model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std, device)
     model.to(device)
