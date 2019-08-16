@@ -219,7 +219,7 @@ class TencentAlchemyDataset(Dataset):
 
     def _load(self):
         if self.mode == 'dev':
-            target_file = pathlib.Path(self.file_dir, "train.csv")
+            target_file = pathlib.Path(self.file_dir, "dev_target.csv")
             self.target = pd.read_csv(target_file,
                                       index_col=0,
                                       usecols=[
@@ -234,6 +234,7 @@ class TencentAlchemyDataset(Dataset):
             result = self.sdf_to_dgl(sdf_file)
             if result is None:
                 continue
+            print(cnt)
             self.graphs.append(result[0])
             self.labels.append(result[1])
         self.normalize()

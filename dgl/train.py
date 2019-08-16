@@ -7,6 +7,7 @@ import torch as th
 import torch.nn as nn
 from sch import SchNetModel
 from mgcn import MGCNModel
+from mpnn import MPNNModel
 from torch.utils.data import DataLoader
 from Alchemy_dataset import TencentAlchemyDataset, batcher
 
@@ -26,8 +27,9 @@ def train(model="sch", epochs=80, device=th.device("cpu")):
         model = MGCNModel(norm=True, output_dim=12)
     elif model == "MPNN":
         model = MPNNModel(output_dim=12)
-
-    model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std, device)
+    print(model)
+    if model.name in ["MGCN", "SchNet"]:
+        model.set_mean_std(alchemy_dataset.mean, alchemy_dataset.std, device)
     model.to(device)
 
     loss_fn = nn.MSELoss()
@@ -63,9 +65,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-M",
                         "--model",
-                        help="model name (sch or mgcn)",
+                        help="model name (sch, mgcn or MPNN)",
                         default="sch")
     parser.add_argument("--epochs", help="number of epochs", default=250)
     device = th.device('cuda:0' if th.cuda.is_available() else 'cpu')
     args = parser.parse_args()
+    assert args.model in ["sch", "mgcn", "MPNN"]
     train(args.model, int(args.epochs), device)
