@@ -234,7 +234,6 @@ class TencentAlchemyDataset(Dataset):
             result = self.sdf_to_dgl(sdf_file)
             if result is None:
                 continue
-            print(cnt)
             self.graphs.append(result[0])
             self.labels.append(result[1])
         self.normalize()
