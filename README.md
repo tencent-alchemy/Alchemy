@@ -3,6 +3,8 @@
 Here is the repo for Tencent Alchemy Tools. We currently provide a PyG dataloader for Alchemy contest, as well as a PyG mpnn model.
 
 
+
+
 ## HOWTO
 
 ### How to use deep graph lib (dgl) dataloader for Alchemy
@@ -58,3 +60,15 @@ You can also download manually from the [homepage](https://alchemy.tencent.com/)
 
 If you download Alchemy dataset and extract at `pyg/data-bin/raw`,  you can simply run [pyg/mpnn.py](pyg/mpnn.py) for training. After training, the example mpnn model will dump a `target.csv` file which is ready to submit to CodaLab for evaluation.
 
+
+## Citation
+
+Please cite as:
+```
+@article{chen2019alchemy,
+  title={Alchemy: A Quantum Chemistry Dataset for Benchmarking AI Models},
+  author={Chen, Guangyong and Chen, Pengfei and Hsieh, Chang-Yu and Lee, Chee-Kong and Liao, Benben and Liao, Renjie and Liu, Weiwen and Qiu, Jiezhong and Sun, Qiming and Tang, Jie and Zemel, Richard and Zhang, Shengyu},
+  journal={arXiv preprint arXiv:1906.09427},
+  year={2019}
+}
+```
