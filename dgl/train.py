@@ -1,7 +1,6 @@
 # -*- coding:utf-8 -*-
 """Sample training code
 """
-
 import argparse
 import torch as th
 import torch.nn as nn
